@@ -35,6 +35,7 @@ class MicroBatching extends EventEmitter {
       batchInterval: config.batchInterval || 1000,
       maxRetries: config.maxRetries || 3,
       retryCondition: config.retryCondition || this.defaultRetryCondition,
+      backoffStrategy: config.backoffStrategy || this.defaultBackoffStrategy,
     };
     this.jobsQueue = [];
     this.timer = null;
@@ -44,9 +45,24 @@ class MicroBatching extends EventEmitter {
   }
 
   /**
+   * @param {number} retryCount
+   * @returns {number}
+   * @description Default backoff strategy: exponential backoff with jitter.
+   * This helps to avoid thundering herd problem.
+   */
+  defaultBackoffStrategy(retryCount) {
+    const baseDelay = 1000; // 1 second
+    const maxDelay = 30000; // 30 seconds
+    const delay = Math.min(baseDelay * Math.pow(2, retryCount), maxDelay);
+    const jitter = Math.random() * delay * 0.1; // Add up to 10% jitter
+    return delay + jitter;
+  }
+
+  /**
    * @param {object} result
    * @param {Job} job
    * @returns {boolean}
+   * @description Default retry condition: retry if the job failed and hasn't exceeded max retries.
    */
   defaultRetryCondition(result, job) {
     return result.status === "failed" && job.retries < this.config.maxRetries;
@@ -102,7 +118,12 @@ class MicroBatching extends EventEmitter {
       this.isProcessing = true;
       this.lastProcessTime = now;
 
-      const jobsToProcess = this.jobsQueue.splice(0, this.config.batchSize);
+      // Filter out jobs that should not be processed yet (retry condition not met)
+      const jobsToProcess = this.jobsQueue
+        .filter(
+          (entry) => !entry.job.nextRetryTime || entry.job.nextRetryTime <= now
+        )
+        .splice(0, this.config.batchSize);
       const jobObjects = jobsToProcess.map((entry) => entry.job);
 
       try {
@@ -111,9 +132,11 @@ class MicroBatching extends EventEmitter {
         results.forEach((result, index) => {
           const job = jobsToProcess[index].job;
           if (this.config.retryCondition(result, job)) {
+            const backoffDelay = this.config.backoffStrategy(job.retries);
             job.retries += 1;
+            job.nextRetryTime = now + backoffDelay;
             this.jobsQueue.push(jobsToProcess[index]);
-            this.emit("jobRetry", job);
+            this.emit("jobRetry", job, backoffDelay);
           } else if (result.status === "failed") {
             jobsToProcess[index].resolve(result);
             this.emit("jobFailed", job);
@@ -124,7 +147,6 @@ class MicroBatching extends EventEmitter {
 
         this.emit("batchProcessed", jobObjects, results);
       } catch (err) {
-        console.error("Error processing batch:", err);
         jobsToProcess.forEach((entry) =>
           entry.resolve({
             jobId: entry.job.id,
@@ -137,7 +159,18 @@ class MicroBatching extends EventEmitter {
 
         // Check if there are more jobs to process
         if (this.jobsQueue.length > 0) {
-          setTimeout(() => this.processBatch(), this.config.batchInterval);
+          const nextJob = this.jobsQueue[0].job;
+          const delay = nextJob.nextRetryTime
+            ? Math.max(0, nextJob.nextRetryTime - now)
+            : 0;
+          setTimeout(
+            () => this.processBatch(),
+            Math.max(delay, this.config.batchInterval)
+          );
+        } else {
+          // Stop the interval if the queue is empty
+          clearInterval(this.timer);
+          this.timer = null;
         }
       }
     }
