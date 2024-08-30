@@ -2,14 +2,11 @@ const EventEmitter = require("events");
 
 class MicroBatching extends EventEmitter {
   /**
-   *
    * @param {QueueInterface} queue
    * @param {BatchProcessorInterface} batchProcessor
-   * @param {number} batchSize
-   * @param {number} batchInterval
    * @param {object} config
    */
-  constructor(queue, batchProcessor, batchSize, batchInterval, config = {}) {
+  constructor(queue, batchProcessor, config = {}) {
     super();
 
     if (
@@ -29,42 +26,37 @@ class MicroBatching extends EventEmitter {
 
     this.queue = queue;
     this.batchProcessor = batchProcessor;
-    this.batchSize = batchSize;
-    this.batchInterval = batchInterval;
-    this.maxRetries = config.maxRetries || 3; // Default to 3 retries if not provided
-    this.retryCondition = config.retryCondition || this.defaultRetryCondition;
+    this.config = {
+      batchSize: config.batchSize || 10,
+      batchInterval: config.batchInterval || 1000,
+      maxRetries: config.maxRetries || 3,
+      retryCondition: config.retryCondition || this.defaultRetryCondition,
+    };
     this.jobsQueue = [];
     this.timer = null;
-    this.isProcessing = false; // Tracks whether a batch is being processed
+    this.isProcessing = false;
   }
 
-  // Default retry condition if the user does not provide one
   defaultRetryCondition(result, job) {
-    return result.status === "failed" && job.retries < this.maxRetries;
+    return result.status === "failed" && job.retries < this.config.maxRetries;
   }
 
   start() {
     this.timer = setInterval(() => {
       this.processBatch();
-    }, this.batchInterval);
+    }, this.config.batchInterval);
 
-    // Start processing jobs from the queue
     this.queue.process(this.processBatch.bind(this));
-
-    // Emit a 'start' event
     this.emit("start");
   }
 
   submitJob(job) {
     return new Promise((resolve) => {
-      job.retries = 0; // Initialize retry counter
+      job.retries = 0;
       this.jobsQueue.push({ job, resolve });
-
-      // Emit a 'jobSubmitted' event
       this.emit("jobSubmitted", job);
 
-      // Process the batch immediately if this is a single job or the queue meets the batch size
-      if (this.jobsQueue.length >= this.batchSize) {
+      if (this.jobsQueue.length >= this.config.batchSize) {
         this.processBatch();
       }
     });
@@ -73,7 +65,7 @@ class MicroBatching extends EventEmitter {
   async processBatch() {
     if (this.jobsQueue.length > 0 && !this.isProcessing) {
       this.isProcessing = true;
-      const jobsToProcess = this.jobsQueue.splice(0, this.batchSize);
+      const jobsToProcess = this.jobsQueue.splice(0, this.config.batchSize);
       const jobObjects = jobsToProcess.map((entry) => entry.job);
 
       try {
@@ -81,22 +73,18 @@ class MicroBatching extends EventEmitter {
 
         results.forEach((result, index) => {
           const job = jobsToProcess[index].job;
-          if (this.retryCondition(result, job)) {
-            // Retry the job
+          if (this.config.retryCondition(result, job)) {
             job.retries += 1;
-            this.jobsQueue.push(jobsToProcess[index]); // Re-add job to the queue
+            this.jobsQueue.push(jobsToProcess[index]);
             this.emit("jobRetry", job);
           } else if (result.status === "failed") {
-            // Exhausted retries, mark as failed
             jobsToProcess[index].resolve(result);
             this.emit("jobFailed", job);
           } else {
-            // Job succeeded
             jobsToProcess[index].resolve(result);
           }
         });
 
-        // Emit a 'batchProcessed' event
         this.emit("batchProcessed", jobObjects, results);
       } catch (err) {
         console.error("Error processing batch:", err);
@@ -119,7 +107,6 @@ class MicroBatching extends EventEmitter {
     return new Promise((resolve) => {
       const checkForCompletion = () => {
         if (this.jobsQueue.length === 0 && !this.isProcessing) {
-          // Emit a 'shutdownComplete' event
           this.emit("shutdownComplete");
           resolve();
         } else {
@@ -127,10 +114,7 @@ class MicroBatching extends EventEmitter {
         }
       };
 
-      // Emit a 'shutdown' event
       this.emit("shutdown");
-
-      // Process any remaining jobs before shutdown
       this.processBatch().then(checkForCompletion);
     });
   }
