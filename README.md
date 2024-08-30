@@ -13,6 +13,13 @@ This library provides a queue-agnostic micro-batching system for Node.js. It all
 - **Lightweight:** Minimal dependencies and easy to integrate into existing projects.
 - **JavaScript:** Written in plain JavaScript, so it can be used in any Node.js project.
 - **Tested:** Includes comprehensive tests to ensure reliability.
+- **Intelligent Batch Processing:** Processes single jobs immediately and respects batch intervals for multiple jobs.
+
+### Batch Processing Behaviour
+
+- If a single job is submitted, it will be processed immediately without waiting for the batch interval.
+- If multiple jobs are submitted, they will be processed in batches according to the specified `batchSize` and `batchInterval`.
+- The library will always try to fill a batch up to `batchSize`, but will also process smaller batches if the `batchInterval` has elapsed since the last batch was processed.
 
 ## Installation
 

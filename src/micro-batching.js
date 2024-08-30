@@ -39,6 +39,7 @@ class MicroBatching extends EventEmitter {
     this.jobsQueue = [];
     this.timer = null;
     this.isProcessing = false;
+    this.lastProcessTime = Date.now();
   }
 
   /**
@@ -72,7 +73,11 @@ class MicroBatching extends EventEmitter {
       this.jobsQueue.push({ job, resolve });
       this.emit("jobSubmitted", job);
 
-      if (this.jobsQueue.length >= this.config.batchSize) {
+      if (this.jobsQueue.length === 1) {
+        // Process immediately if it's the only job
+        this.processBatch();
+      } else if (this.jobsQueue.length >= this.config.batchSize) {
+        // Process if we've reached the batch size
         this.processBatch();
       }
     });
@@ -82,8 +87,18 @@ class MicroBatching extends EventEmitter {
    * @returns {Promise}
    */
   async processBatch() {
-    if (this.jobsQueue.length > 0 && !this.isProcessing) {
+    const now = Date.now();
+    const timeSinceLastProcess = now - this.lastProcessTime;
+
+    if (
+      this.jobsQueue.length > 0 &&
+      !this.isProcessing &&
+      (timeSinceLastProcess >= this.config.batchInterval ||
+        this.jobsQueue.length === 1)
+    ) {
       this.isProcessing = true;
+      this.lastProcessTime = now;
+
       const jobsToProcess = this.jobsQueue.splice(0, this.config.batchSize);
       const jobObjects = jobsToProcess.map((entry) => entry.job);
 
@@ -116,6 +131,11 @@ class MicroBatching extends EventEmitter {
         );
       } finally {
         this.isProcessing = false;
+
+        // Check if there are more jobs to process
+        if (this.jobsQueue.length > 0) {
+          setTimeout(() => this.processBatch(), this.config.batchInterval);
+        }
       }
     }
   }

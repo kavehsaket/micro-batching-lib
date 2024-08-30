@@ -150,4 +150,51 @@ describe("MicroBatching Library", () => {
 
     await microBatching.shutdown();
   });
+
+  it("should process a single job immediately", async () => {
+    const queue = new MockQueue();
+    const batchProcessor = new MockBatchProcessor({ failFirstTime: false });
+
+    const microBatching = new MicroBatching(queue, batchProcessor, {
+      batchSize: 5,
+      batchInterval: 1000,
+    });
+    microBatching.start();
+
+    const startTime = Date.now();
+    const result = await microBatching.submitJob(new Job(1, "Single Job Data"));
+    const endTime = Date.now();
+
+    expect(result.status).toBe("success");
+    expect(result.message).toBe("Processed successfully");
+    expect(endTime - startTime).toBeLessThan(100); // Processed almost immediately
+
+    await microBatching.shutdown();
+  });
+
+  it("should respect batch interval when processing multiple batches", async () => {
+    const queue = new MockQueue();
+    const batchProcessor = new MockBatchProcessor({ failFirstTime: false });
+
+    const microBatching = new MicroBatching(queue, batchProcessor, {
+      batchSize: 2,
+      batchInterval: 1000,
+    });
+    microBatching.start();
+
+    const startTime = Date.now();
+    const jobs = [
+      microBatching.submitJob(new Job(1, "Job 1")),
+      microBatching.submitJob(new Job(2, "Job 2")),
+      microBatching.submitJob(new Job(3, "Job 3")),
+      microBatching.submitJob(new Job(4, "Job 4")),
+    ];
+
+    await Promise.all(jobs);
+    const endTime = Date.now();
+
+    expect(endTime - startTime).toBeGreaterThanOrEqual(1000); // At least one interval wait
+
+    await microBatching.shutdown();
+  });
 });
