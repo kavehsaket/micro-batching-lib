@@ -4,11 +4,19 @@ const MockQueue = require("./__mocks__/mock-queue");
 const MockBatchProcessor = require("./__mocks__/mock-batch-processor");
 
 describe("MicroBatching Library", () => {
+  let microBatching;
+
+  afterEach(async () => {
+    if (microBatching) {
+      await microBatching.shutdown();
+    }
+  });
+
   it("should process jobs successfully without retries", async () => {
     const queue = new MockQueue();
     const batchProcessor = new MockBatchProcessor({ failFirstTime: false });
 
-    const microBatching = new MicroBatching(queue, batchProcessor, {
+    microBatching = new MicroBatching(queue, batchProcessor, {
       batchSize: 2,
       batchInterval: 500,
     });
@@ -17,8 +25,6 @@ describe("MicroBatching Library", () => {
     const result = await microBatching.submitJob(new Job(1, "Data for job 1"));
     expect(result.status).toBe("success");
     expect(result.message).toBe("Processed successfully");
-
-    await microBatching.shutdown();
   });
 
   it("should retry a failed job up to the specified retry limit", async () => {
@@ -167,7 +173,7 @@ describe("MicroBatching Library", () => {
 
     expect(result.status).toBe("success");
     expect(result.message).toBe("Processed successfully");
-    expect(endTime - startTime).toBeLessThan(100); // Processed almost immediately
+    expect(endTime - startTime).toBeLessThan(100);
 
     await microBatching.shutdown();
   });

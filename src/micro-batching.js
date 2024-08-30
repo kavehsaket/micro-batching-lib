@@ -40,6 +40,7 @@ class MicroBatching extends EventEmitter {
     this.timer = null;
     this.isProcessing = false;
     this.lastProcessTime = Date.now();
+    this.isShuttingDown = false;
   }
 
   /**
@@ -87,6 +88,8 @@ class MicroBatching extends EventEmitter {
    * @returns {Promise}
    */
   async processBatch() {
+    if (this.isShuttingDown) return; // Don't process new batches during shutdown
+
     const now = Date.now();
     const timeSinceLastProcess = now - this.lastProcessTime;
 
@@ -143,22 +146,21 @@ class MicroBatching extends EventEmitter {
   /**
    * @returns {Promise}
    */
-  shutdown() {
+  async shutdown() {
+    this.isShuttingDown = true; // I added this to prevent new jobs from being processed while we're shutting down
+    this.queue.stop();
     clearInterval(this.timer);
 
-    return new Promise((resolve) => {
-      const checkForCompletion = () => {
-        if (this.jobsQueue.length === 0 && !this.isProcessing) {
-          this.emit("shutdownComplete");
-          resolve();
-        } else {
-          setImmediate(checkForCompletion);
-        }
-      };
+    // Process remaining jobs
+    while (this.jobsQueue.length > 0 || this.isProcessing) {
+      if (!this.isProcessing) {
+        await this.processBatch();
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Short delay to prevent tight loop in case of high job volume in the queue in node.js
+    }
 
-      this.emit("shutdown");
-      this.processBatch().then(checkForCompletion);
-    });
+    this.emit("shutdownComplete");
+    return Promise.resolve();
   }
 }
 

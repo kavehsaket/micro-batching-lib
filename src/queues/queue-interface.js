@@ -13,6 +13,10 @@ class QueueInterface {
   process(handler) {
     throw new Error('Method "process" not implemented');
   }
+
+  stop() {
+    throw new Error('Method "stop" not implemented');
+  }
 }
 
 module.exports = QueueInterface;

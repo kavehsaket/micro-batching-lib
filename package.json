@@ -4,7 +4,7 @@
   "description": "A queue-agnostic micro-batching library for Node.js with customisable retry logic",
   "main": "index.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest --detectOpenHandles"
   },
   "keywords": [
     "micro-batching",
