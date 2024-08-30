@@ -8,7 +8,10 @@ describe("MicroBatching Library", () => {
     const queue = new MockQueue();
     const batchProcessor = new MockBatchProcessor({ failFirstTime: false });
 
-    const microBatching = new MicroBatching(queue, batchProcessor, 2, 500);
+    const microBatching = new MicroBatching(queue, batchProcessor, {
+      batchSize: 2,
+      batchInterval: 500,
+    });
     microBatching.start();
 
     const result = await microBatching.submitJob(new Job(1, "Data for job 1"));
@@ -22,7 +25,9 @@ describe("MicroBatching Library", () => {
     const queue = new MockQueue();
     const batchProcessor = new MockBatchProcessor({ failFirstTime: true });
 
-    const microBatching = new MicroBatching(queue, batchProcessor, 2, 500, {
+    const microBatching = new MicroBatching(queue, batchProcessor, {
+      batchSize: 2,
+      batchInterval: 500,
       maxRetries: 3,
       retryCondition: (result, job) => {
         return result.status === "failed" && job.retries < 3;
@@ -45,7 +50,9 @@ describe("MicroBatching Library", () => {
       failAlways: true,
     });
 
-    const microBatching = new MicroBatching(queue, batchProcessor, 2, 500, {
+    const microBatching = new MicroBatching(queue, batchProcessor, {
+      batchSize: 2,
+      batchInterval: 500,
       maxRetries: 3,
       retryCondition: (result, job) => {
         return result.status === "failed" && job.retries < 3;
@@ -65,7 +72,10 @@ describe("MicroBatching Library", () => {
     const queue = new MockQueue();
     const batchProcessor = new MockBatchProcessor({ failFirstTime: false });
 
-    const microBatching = new MicroBatching(queue, batchProcessor, 2, 500);
+    const microBatching = new MicroBatching(queue, batchProcessor, {
+      batchSize: 2,
+      batchInterval: 500,
+    });
     microBatching.start();
 
     await microBatching.submitJob(new Job(1, "Data for job 1"));
@@ -81,12 +91,62 @@ describe("MicroBatching Library", () => {
     const queue = new MockQueue();
     const batchProcessor = new MockBatchProcessor({ failFirstTime: false });
 
-    const microBatching = new MicroBatching(queue, batchProcessor, 1, 500);
+    const microBatching = new MicroBatching(queue, batchProcessor, {
+      batchSize: 1,
+      batchInterval: 500,
+    });
     microBatching.start();
 
     const result = await microBatching.submitJob(new Job(1, "Single Job Data"));
     expect(result.status).toBe("success");
     expect(result.message).toBe("Processed successfully");
+
+    await microBatching.shutdown();
+  });
+
+  it("should use default config values when not provided", async () => {
+    const queue = new MockQueue();
+    const batchProcessor = new MockBatchProcessor({ failFirstTime: false });
+
+    const microBatching = new MicroBatching(queue, batchProcessor);
+    microBatching.start();
+
+    const result = await microBatching.submitJob(
+      new Job(1, "Default Config Job")
+    );
+    expect(result.status).toBe("success");
+    expect(result.message).toBe("Processed successfully");
+
+    await microBatching.shutdown();
+  });
+
+  it("should use provided config values over default values", async () => {
+    const queue = new MockQueue();
+    const batchProcessor = new MockBatchProcessor();
+
+    // Custom configuration values
+    const customConfig = {
+      batchSize: 5, // Default is 10
+      batchInterval: 2000, // Default is 1000
+      maxRetries: 5, // Default is 3
+      retryCondition: (result, job) =>
+        result.status === "failed" && job.retries < 5,
+    };
+
+    const microBatching = new MicroBatching(
+      queue,
+      batchProcessor,
+      customConfig
+    );
+    microBatching.start();
+
+    // Check if the custom config values are set correctly based on the provided values
+    expect(microBatching.config.batchSize).toBe(customConfig.batchSize);
+    expect(microBatching.config.batchInterval).toBe(customConfig.batchInterval);
+    expect(microBatching.config.maxRetries).toBe(customConfig.maxRetries);
+    expect(microBatching.config.retryCondition).toBe(
+      customConfig.retryCondition
+    );
 
     await microBatching.shutdown();
   });
