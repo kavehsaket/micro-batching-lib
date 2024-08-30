@@ -7,12 +7,11 @@
     "test": "jest"
   },
   "keywords": [
-    "[\"micro-batching\"",
-    "\"queue\"",
-    "\"batch",
-    "processing\"",
-    "\"EventEmitter\"",
-    "\"Node.js\"]"
+    "micro-batching",
+    "queue",
+    "batch processing",
+    "EventEmitter",
+    "Node.js"
   ],
   "author": "Kaveh Saket",
   "license": "MIT",

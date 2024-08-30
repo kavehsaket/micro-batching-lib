@@ -1,5 +1,9 @@
 const EventEmitter = require("events");
 
+/**
+ * @class MicroBatching
+ * @extends EventEmitter
+ */
 class MicroBatching extends EventEmitter {
   /**
    * @param {QueueInterface} queue
@@ -37,10 +41,18 @@ class MicroBatching extends EventEmitter {
     this.isProcessing = false;
   }
 
+  /**
+   * @param {object} result
+   * @param {Job} job
+   * @returns {boolean}
+   */
   defaultRetryCondition(result, job) {
     return result.status === "failed" && job.retries < this.config.maxRetries;
   }
 
+  /**
+   * @returns {void}
+   */
   start() {
     this.timer = setInterval(() => {
       this.processBatch();
@@ -50,6 +62,10 @@ class MicroBatching extends EventEmitter {
     this.emit("start");
   }
 
+  /**
+   * @param {Job} job
+   * @returns {Promise}
+   */
   submitJob(job) {
     return new Promise((resolve) => {
       job.retries = 0;
@@ -62,6 +78,9 @@ class MicroBatching extends EventEmitter {
     });
   }
 
+  /**
+   * @returns {Promise}
+   */
   async processBatch() {
     if (this.jobsQueue.length > 0 && !this.isProcessing) {
       this.isProcessing = true;
@@ -101,6 +120,9 @@ class MicroBatching extends EventEmitter {
     }
   }
 
+  /**
+   * @returns {Promise}
+   */
   shutdown() {
     clearInterval(this.timer);
 

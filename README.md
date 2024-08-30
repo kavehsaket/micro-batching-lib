@@ -24,7 +24,12 @@ pnpm add micro-batching-lib
 Here's a simple example of how to use the Micro-Batching Library:
 
 ```javascript
-const { MicroBatching, Job } = require("micro-batching-lib");
+const {
+  MicroBatching,
+  Job,
+  QueueInterface,
+  BatchProcessorInterface,
+} = require("micro-batching-lib");
 const { Queue } = require("./path/to/your/queue/implementation");
 const {
   BatchProcessor,
