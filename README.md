@@ -10,9 +10,8 @@ This library provides a queue-agnostic micro-batching system for Node.js. It all
 - **Event-Driven:** Leverages `EventEmitter` to provide hooks into the job processing lifecycle.
 - **Graceful Shutdown:** Ensures all jobs are processed before shutting down.
 - **Extensible:** Easily extend the system to support different queues and batch processing logic.
-- **Lightweight:** Minimal dependencies and easy to integrate into existing projects.
-- **JavaScript:** Written in plain JavaScript, so it can be used in any Node.js project.
-- **Tested:** Includes comprehensive tests to ensure reliability.
+- **Lightweight:** Zero dependencies and written in plain JavaScript, so it can be used in any Node.js project.
+- **Tested:** The library is tested with a basic in-memory queue and batch processor.
 - **Intelligent Batch Processing:** Processes single jobs immediately and respects batch intervals for multiple jobs.
 - **Logging:** Integrate with any logging system to log important events and states.
 - **External Handler:** Process jobs outside of the batching system for exceptional cases.
