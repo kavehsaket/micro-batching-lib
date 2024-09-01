@@ -108,13 +108,13 @@ microBatching.shutdown();
 
 ## Job Object
 
-The library expects a job object to be submitted with an id and data. The id must be a number and the data can be any type. The library does not place any restrictions on the type of data that can be submitted. You can extend the Job class to add any additional data you need to handle in your `BatchProcessor`.
+The library expects a job object to be submitted with an id and data. The id must be a number or a string but should be unique within the system. The data can be any type. The library does not place any restrictions on the type of data that can be submitted. You can extend the Job class to add any additional data you need to handle in your `BatchProcessor`.
 
 ```javascript
 class Job {
   constructor(id, data) {
-    this.id = id;
-    this.data = data;
+    this.id = id; // The id must be a number or a string.
+    this.data = data; // The data can be any type.
   }
 }
 ```
