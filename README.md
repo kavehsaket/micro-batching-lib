@@ -92,7 +92,6 @@ const microBatching = new MicroBatching(queue, batchProcessor, {
     info: (message) => console.log(`INFO: ${message}`),
     warn: (message) => console.log(`WARN: ${message}`),
     error: (message) => console.log(`ERROR: ${message}`),
-    debug: (message) => console.log(`DEBUG: ${message}`),
 });
 
 microBatching.on("job_added", (job) => {
@@ -194,8 +193,8 @@ const microBatching = new MicroBatching(queue, batchProcessor, {
   },
   logger: {
     info: (message) => console.log(`INFO: ${message}`),
-    error: (message) => console.log(`ERROR: ${message}`),
     warn: (message) => console.log(`WARN: ${message}`),
+    error: (message) => console.log(`ERROR: ${message}`),
   },
 });
 ```
