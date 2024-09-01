@@ -106,6 +106,30 @@ microBatching.submitJob(job);
 microBatching.shutdown();
 ```
 
+## Job Object
+
+The library expects a job object to be submitted with an id and data. The id must be a number and the data can be any type. The library does not place any restrictions on the type of data that can be submitted. You can extend the Job class to add any additional data you need to handle in your `BatchProcessor`.
+
+```javascript
+class Job {
+  constructor(id, data) {
+    this.id = id;
+    this.data = data;
+  }
+}
+```
+
+Example extended job class:
+
+```javascript
+class ExampleJob extends Job {
+  constructor(id, data) {
+    super(id, data);
+    this.priority = priority;
+  }
+}
+```
+
 ## Queue and Batch Processor Interfaces
 
 The library provides two interfaces that need to be implemented:
@@ -206,3 +230,7 @@ This project is licensed under the MIT License.
 ## Questions
 
 If you have any questions, please open an issue on GitHub.
+
+```
+
+```

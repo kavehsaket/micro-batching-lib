@@ -1,4 +1,5 @@
 const EventEmitter = require("events");
+const Job = require("./job");
 
 /**
  * @class MicroBatching
@@ -90,6 +91,9 @@ class MicroBatching extends EventEmitter {
    * @returns {Promise}
    */
   submitJob(job) {
+    if (!(job instanceof Job)) {
+      return Promise.reject(new Error("Job must be an instance of Job"));
+    }
     return new Promise((resolve) => {
       job.retries = 0;
       this.jobsQueue.push({ job, resolve });

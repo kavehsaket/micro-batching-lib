@@ -494,4 +494,22 @@ describe("MicroBatching Library", () => {
     expect(logger.info).toHaveBeenCalledWith("MicroBatching shutting down");
     expect(logger.info).toHaveBeenCalledWith("MicroBatching shutdown complete");
   });
+
+  it("should handle invalid job submission", async () => {
+    const queue = new MockQueue();
+    const batchProcessor = new MockBatchProcessor({ failFirstTime: false });
+
+    const microBatching = new MicroBatching(queue, batchProcessor, {
+      batchSize: 2,
+      batchInterval: 500,
+    });
+    microBatching.start();
+
+    const invalidJob = "Invalid job";
+    await expect(microBatching.submitJob(invalidJob)).rejects.toThrow(
+      "Job must be an instance of Job"
+    );
+
+    await microBatching.shutdown();
+  });
 });
