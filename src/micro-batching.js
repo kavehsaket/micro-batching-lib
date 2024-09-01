@@ -54,7 +54,7 @@ class MicroBatching extends EventEmitter {
     const baseDelay = 1000; // 1 second
     const maxDelay = 30000; // 30 seconds
     const delay = Math.min(baseDelay * Math.pow(2, retryCount), maxDelay);
-    const jitter = Math.random() * delay * 0.1; // Add up to 10% jitter
+    const jitter = Math.random() * delay * 0.1; // 10% jitter
     return delay + jitter;
   }
 
@@ -137,11 +137,22 @@ class MicroBatching extends EventEmitter {
             job.nextRetryTime = now + backoffDelay;
             this.jobsQueue.push(jobsToProcess[index]);
             this.emit("jobRetry", job, backoffDelay);
-          } else if (result.status === "failed") {
-            jobsToProcess[index].resolve(result);
-            this.emit("jobFailed", job);
           } else {
-            jobsToProcess[index].resolve(result);
+            // Remove the job from jobsQueue if it's not being retried
+            const jobIndex = this.jobsQueue.findIndex(
+              (entry) => entry.job.id === job.id
+            );
+            if (jobIndex !== -1) {
+              this.jobsQueue.splice(jobIndex, 1);
+            }
+
+            if (result.status === "failed") {
+              jobsToProcess[index].resolve(result);
+              this.emit("jobFailed", job);
+            } else {
+              jobsToProcess[index].resolve(result);
+              this.emit("jobCompleted", job);
+            }
           }
         });
 
@@ -180,18 +191,16 @@ class MicroBatching extends EventEmitter {
    * @returns {Promise}
    */
   async shutdown() {
-    this.isShuttingDown = true; // I added this to prevent new jobs from being processed while we're shutting down
-    this.queue.stop();
     clearInterval(this.timer);
-
+    this.isShuttingDown = true;
+    this.queue.stop();
     // Process remaining jobs
     while (this.jobsQueue.length > 0 || this.isProcessing) {
       if (!this.isProcessing) {
         await this.processBatch();
       }
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Short delay to prevent tight loop in case of high job volume in the queue in node.js
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Short delay to prevent tight loop
     }
-
     this.emit("shutdownComplete");
     return Promise.resolve();
   }
