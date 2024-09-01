@@ -431,4 +431,67 @@ describe("MicroBatching Library", () => {
 
     await microBatching.shutdown();
   }, 10000);
+
+  it("should call external handler for failed jobs", async () => {
+    const queue = new MockQueue();
+    const batchProcessor = new MockBatchProcessor({
+      failFirstTime: true,
+      failAlways: true,
+    });
+
+    const externalHandler = jest.fn();
+
+    const microBatching = new MicroBatching(queue, batchProcessor, {
+      batchSize: 2,
+      batchInterval: 500,
+      maxRetries: 1,
+      retryCondition: (result, job) => {
+        return result.status === "failed" && job.retries < 1;
+      },
+      externalHandler,
+    });
+
+    microBatching.start();
+
+    const result = await microBatching.submitJob(new Job(1, "Data for job 1"));
+    expect(result.status).toBe("failed");
+    expect(result.message).toBe("Failed after all retries");
+
+    expect(externalHandler).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 })
+    );
+
+    await microBatching.shutdown();
+  });
+
+  it("should log events using the provided logger", async () => {
+    const queue = new MockQueue();
+    const batchProcessor = new MockBatchProcessor({ failFirstTime: false });
+
+    const logger = {
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    };
+
+    const microBatching = new MicroBatching(queue, batchProcessor, {
+      batchSize: 2,
+      batchInterval: 500,
+      logger,
+    });
+
+    microBatching.start();
+    expect(logger.info).toHaveBeenCalledWith("MicroBatching started");
+
+    const result = await microBatching.submitJob(new Job(1, "Data for job 1"));
+    expect(result.status).toBe("success");
+    expect(result.message).toBe("Processed successfully");
+
+    expect(logger.info).toHaveBeenCalledWith("Job submitted: 1");
+    expect(logger.info).toHaveBeenCalledWith("Batch processed: 1 jobs");
+
+    await microBatching.shutdown();
+    expect(logger.info).toHaveBeenCalledWith("MicroBatching shutting down");
+    expect(logger.info).toHaveBeenCalledWith("MicroBatching shutdown complete");
+  });
 });

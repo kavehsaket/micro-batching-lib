@@ -6,7 +6,7 @@ This library provides a queue-agnostic micro-batching system for Node.js. It all
 
 - **Queue-Agnostic:** Bring your own queue system that follows the provided interface.
 - **Batch-Processor-Agnostic:** Bring your own batch processor that follows the provided interface.
-- **Configurable:** Configure the batch size, interval, and retry logic as needed.
+- **Configurable:** Configure the batch size, interval, retry logic, and logging as needed.
 - **Event-Driven:** Leverages `EventEmitter` to provide hooks into the job processing lifecycle.
 - **Graceful Shutdown:** Ensures all jobs are processed before shutting down.
 - **Extensible:** Easily extend the system to support different queues and batch processing logic.
@@ -14,6 +14,8 @@ This library provides a queue-agnostic micro-batching system for Node.js. It all
 - **JavaScript:** Written in plain JavaScript, so it can be used in any Node.js project.
 - **Tested:** Includes comprehensive tests to ensure reliability.
 - **Intelligent Batch Processing:** Processes single jobs immediately and respects batch intervals for multiple jobs.
+- **Logging:** Integrate with any logging system to log important events and states.
+- **External Handler:** Process jobs outside of the batching system for exceptional cases.
 
 ### Batch Processing Behaviour
 
@@ -43,6 +45,7 @@ The library implements an exponential backoff strategy with jitter for retries:
 - For each retry, the delay increases exponentially up to a maximum of 30 seconds.
 - A random jitter of up to 10% is added to the delay to prevent thundering herd problems.
 - This handling of retries helps to distribute the load on the system over time, preventing a large number of jobs from retrying simultaneously.
+- The externalHandler is a fallback mechanism to process jobs outside of the batching system. This is useful for exceptional cases where a job cannot be processed within the batching system.
 
 Both the retry condition and backoff strategy can be customised in the configuration:
 
@@ -80,6 +83,16 @@ const microBatching = new MicroBatching(queue, batchProcessor, {
   retryCondition: (result, job) =>
     result.status === "failed" && job.retries < 3, // A function that determines whether a job should be retried.
   backoffStrategy: (retries) => Math.min(30, Math.pow(2, retries) * 1000), // A function that determines the delay before retrying a failed job.
+  externalHandler: (job) => {
+    console.log(
+      `Job ${job.id} is being processed outside of the batching system`
+    );
+  },
+  logger: {
+    info: (message) => console.log(`INFO: ${message}`),
+    warn: (message) => console.log(`WARN: ${message}`),
+    error: (message) => console.log(`ERROR: ${message}`),
+    debug: (message) => console.log(`DEBUG: ${message}`),
 });
 
 microBatching.on("job_added", (job) => {
@@ -151,8 +164,18 @@ The `MicroBatching` class accepts a configuration object as its third parameter.
    - Description: A function that determines whether a job should be retried. It receives the processing result and the job object as parameters and should return a boolean.
 
 5. **backoffStrategy** (default: exponential backoff with jitter)
+
    - Type: `function(retryCount)`
    - Description: A function that determines the delay before retrying a failed job. It receives the current retry count as a parameter and should return the delay in milliseconds.
+
+6. **logger** (default: null)
+
+   - Type: `object`
+   - Description: An object that implements the logging interface. It should have `info`, `error`, and `warn` methods.
+
+7. **externalHandler** (default: null)
+   - Type: `function(job)`
+   - Description: A function that handles jobs outside of the batching system. It receives the job object as a parameter and should return a promise that resolves when the job is processed.
 
 Example configuration:
 
@@ -164,6 +187,16 @@ const microBatching = new MicroBatching(queue, batchProcessor, {
   retryCondition: (result, job) =>
     result.status === "failed" && job.retries < 3,
   backoffStrategy: (retries) => Math.min(30, Math.pow(2, retries) * 1000),
+  externalHandler: (job) => {
+    console.log(
+      `Job ${job.id} is being processed outside of the batching system`
+    );
+  },
+  logger: {
+    info: (message) => console.log(`INFO: ${message}`),
+    error: (message) => console.log(`ERROR: ${message}`),
+    warn: (message) => console.log(`WARN: ${message}`),
+  },
 });
 ```
 

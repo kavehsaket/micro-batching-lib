@@ -36,6 +36,8 @@ class MicroBatching extends EventEmitter {
       maxRetries: config.maxRetries || 3,
       retryCondition: config.retryCondition || this.defaultRetryCondition,
       backoffStrategy: config.backoffStrategy || this.defaultBackoffStrategy,
+      logger: config.logger || null, // Default to null if no logger is provided
+      externalHandler: config.externalHandler || null, // External handler for failed jobs
     };
     this.jobsQueue = [];
     this.timer = null;
@@ -72,6 +74,9 @@ class MicroBatching extends EventEmitter {
    * @returns {void}
    */
   start() {
+    if (this.config.logger) {
+      this.config.logger.info("MicroBatching started");
+    }
     this.timer = setInterval(() => {
       this.processBatch();
     }, this.config.batchInterval);
@@ -89,6 +94,9 @@ class MicroBatching extends EventEmitter {
       job.retries = 0;
       this.jobsQueue.push({ job, resolve });
       this.emit("jobSubmitted", job);
+      if (this.config.logger) {
+        this.config.logger.info(`Job submitted: ${job.id}`);
+      }
 
       if (this.jobsQueue.length === 1) {
         // Process immediately if it's the only job
@@ -137,6 +145,11 @@ class MicroBatching extends EventEmitter {
             job.nextRetryTime = now + backoffDelay;
             this.jobsQueue.push(jobsToProcess[index]);
             this.emit("jobRetry", job, backoffDelay);
+            if (this.config.logger) {
+              this.config.logger.warn(
+                `Job retry: ${job.id}, retries: ${job.retries}, backoff: ${backoffDelay}`
+              );
+            }
           } else {
             // Remove the job from jobsQueue if it's not being retried
             const jobIndex = this.jobsQueue.findIndex(
@@ -149,14 +162,26 @@ class MicroBatching extends EventEmitter {
             if (result.status === "failed") {
               jobsToProcess[index].resolve(result);
               this.emit("jobFailed", job);
+              if (this.config.logger) {
+                this.config.logger.error(`Job failed: ${job.id}`);
+              }
+              if (this.config.externalHandler) {
+                this.config.externalHandler(job);
+              }
             } else {
               jobsToProcess[index].resolve(result);
               this.emit("jobCompleted", job);
+              if (this.config.logger) {
+                this.config.logger.info(`Job completed: ${job.id}`);
+              }
             }
           }
         });
 
         this.emit("batchProcessed", jobObjects, results);
+        if (this.config.logger) {
+          this.config.logger.info(`Batch processed: ${jobObjects.length} jobs`);
+        }
       } catch (err) {
         jobsToProcess.forEach((entry) =>
           entry.resolve({
@@ -165,6 +190,9 @@ class MicroBatching extends EventEmitter {
             message: err.message,
           })
         );
+        if (this.config.logger) {
+          this.config.logger.error(`Batch processing error: ${err.message}`);
+        }
       } finally {
         this.isProcessing = false;
 
@@ -194,6 +222,9 @@ class MicroBatching extends EventEmitter {
     clearInterval(this.timer);
     this.isShuttingDown = true;
     this.queue.stop();
+    if (this.config.logger) {
+      this.config.logger.info("MicroBatching shutting down");
+    }
     // Process remaining jobs
     while (this.jobsQueue.length > 0 || this.isProcessing) {
       if (!this.isProcessing) {
@@ -202,6 +233,9 @@ class MicroBatching extends EventEmitter {
       await new Promise((resolve) => setTimeout(resolve, 100)); // Short delay to prevent tight loop
     }
     this.emit("shutdownComplete");
+    if (this.config.logger) {
+      this.config.logger.info("MicroBatching shutdown complete");
+    }
     return Promise.resolve();
   }
 }
